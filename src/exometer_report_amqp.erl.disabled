@@ -45,7 +45,7 @@
 %% Implement more serialization formats (eg: BERP)
 %%
 
--module(exometer_report_amqp).
+-module('exometer_report_amqp.erl').
 -behaviour(exometer_report).
 -author("Mark Steele <mark@control-alt-del.org>").
 
