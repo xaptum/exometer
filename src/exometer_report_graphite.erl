@@ -69,19 +69,26 @@ exometer_init(Opts) ->
             Error
     end.
 
-
+%% xaptum  graphite meter data points hack
+exometer_report(Probe, mean, _Extra, Value, St)->
+  exometer_report(Probe, mean_rate, _Extra, Value, St);
+exometer_report(Probe, one, _Extra, Value, St)->
+  exometer_report(Probe, one_minute_rate, _Extra, Value, St);
+exometer_report(Probe, five, _Extra, Value, St)->
+  exometer_report(Probe, five_minute_rate, _Extra, Value, St);
+exometer_report(Probe, fifteen, _Extra, Value, St)->
+  exometer_report(Probe, fifteen_minute_rate, _Extra, Value, St);
 exometer_report(Probe, DataPoint, _Extra, Value, #st{socket = Sock,
                                                     api_key = APIKey,
                                                     prefix = Prefix} = St) ->
-    Line = [key(APIKey, Prefix, Probe, DataPoint), " ",
+ Line = [key(APIKey, Prefix, Probe, DataPoint), " ",
             value(Value), " ", timestamp(), $\n],
-    ?info("Sending ~p", [Line]),
     case gen_tcp:send(Sock, Line) of
         ok ->
-            ?info("Success sending ~p", [Line]),
+            ?debug("Success sending ~s", [Line]),
             {ok, St};
         _ ->
-            ?warning("Failure sending ~p", [Line]),
+            ?info("Failure sending ~s", [Line]),
             reconnect(St)
     end.
 
