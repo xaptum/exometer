@@ -59,7 +59,7 @@ exometer_init(Opts) ->
   AddrType = Host#hostent.h_addrtype,
   Port = get_opt(port, Opts, ?DEFAULT_PORT),
 
-  case gen_udp:open(0, AddrType) of
+  case gen_udp:open(0, [AddrType]) of
     {ok, Sock} ->
       {ok, #st{socket = Sock, address = IP, port = Port, prefix = Prefix, api_key = API_key}};
     {error, _} = Error ->
