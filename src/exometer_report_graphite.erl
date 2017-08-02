@@ -27,13 +27,14 @@
    ]).
 
 -include_lib("exometer_core/include/exometer.hrl").
+-include_lib("kernel/include/inet.hrl").
 
 -define(DEFAULT_HOST, "carbon.hostedgraphite.com").
 -define(DEFAULT_PORT, 2003).
 -define(DEFAULT_CONNECT_TIMEOUT, 5000).
 
 -record(st, {
-          host = ?DEFAULT_HOST,
+          address,
           port = ?DEFAULT_PORT,
           connect_timeout = ?DEFAULT_CONNECT_TIMEOUT,
           name,
@@ -50,24 +51,20 @@
 %% Probe callbacks
 
 exometer_init(Opts) ->
-    ?info("Exometer Graphite Reporter; Opts: ~p~n", [Opts]),
-    API_key = get_opt(api_key, Opts),
-    Prefix = get_opt(prefix, Opts, []),
-    Host = get_opt(host, Opts, ?DEFAULT_HOST),
-    Port = get_opt(port, Opts, ?DEFAULT_PORT),
-    ConnectTimeout = get_opt(connect_timeout, Opts, ?DEFAULT_CONNECT_TIMEOUT),
+  ?info("Exometer Graphite Reporter; Opts: ~p~n", [Opts]),
+  API_key = get_opt(api_key, Opts),
+  Prefix = get_opt(prefix, Opts, []),
+  {ok, Host} = inet:gethostbyname(get_opt(host, Opts, ?DEFAULT_HOST)),
+  [IP | _] = Host#hostent.h_addr_list,
+  AddrType = Host#hostent.h_addrtype,
+  Port = get_opt(port, Opts, ?DEFAULT_PORT),
 
-    case gen_tcp:connect(Host, Port,  [{mode, list}], ConnectTimeout) of
-        {ok, Sock} ->
-            {ok, #st{prefix = Prefix,
-                     api_key = API_key,
-                     socket = Sock,
-                     host = Host,
-                     port = Port,
-                     connect_timeout = ConnectTimeout }};
-        {error, _} = Error ->
-            Error
-    end.
+  case gen_udp:open(0, AddrType) of
+    {ok, Sock} ->
+      {ok, #st{socket = Sock, address = IP, port = Port, prefix = Prefix, api_key = API_key}};
+    {error, _} = Error ->
+      Error
+  end.
 
 %% xaptum  graphite meter data points hack
 exometer_report(Probe, mean, _Extra, Value, St)->
@@ -78,19 +75,18 @@ exometer_report(Probe, five, _Extra, Value, St)->
   exometer_report(Probe, five_minute_rate, _Extra, Value, St);
 exometer_report(Probe, fifteen, _Extra, Value, St)->
   exometer_report(Probe, fifteen_minute_rate, _Extra, Value, St);
-exometer_report(Probe, DataPoint, _Extra, Value, #st{socket = Sock,
-                                                    api_key = APIKey,
-                                                    prefix = Prefix} = St) ->
- Line = [key(APIKey, Prefix, Probe, DataPoint), " ",
-            value(Value), " ", timestamp(), $\n],
-    case gen_tcp:send(Sock, Line) of
-        ok ->
-            ?debug("Success sending ~s", [Line]),
-            {ok, St};
-        _ ->
-            ?info("Failure sending ~s", [Line]),
-            reconnect(St)
-    end.
+exometer_report(Probe, DataPoint, _Extra, Value, #st{
+  address = IP, port = Port, socket = Socket, api_key = APIKey, prefix = Prefix} = St) ->
+  Line = [key(APIKey, Prefix, Probe, DataPoint), " ",
+    value(Value), " ", timestamp(), $\n],
+  case gen_udp:send(Socket, IP, Port, Line) of
+    ok ->
+      ?info("Success sending ~s", [Line]),
+      {ok, St};
+    {error, Reason} ->
+      ?info("Unable to write metric ~s. ~p~n", [Line, Reason]),
+      {ok, St}
+  end.
 
 exometer_subscribe(_Metric, _DataPoint, _Extra, _Interval, St) ->
     {ok, St }.
@@ -148,15 +144,6 @@ value(_) -> 0.
 
 timestamp() ->
     integer_to_list(unix_time()).
-
-
-reconnect(St) ->
-    case gen_tcp:connect(St#st.host, St#st.port,  [{mode, list}], St#st.connect_timeout) of
-        {ok, Sock} ->
-            {ok, St#st{socket = Sock}};
-        {error, _} = Error ->
-            Error
-    end.
 
 unix_time() ->
     datetime_to_unix_time(erlang:universaltime()).
