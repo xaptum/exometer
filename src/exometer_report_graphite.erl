@@ -81,7 +81,7 @@ exometer_report(Probe, DataPoint, _Extra, Value, #st{
     value(Value), " ", timestamp(), $\n],
   case gen_udp:send(Socket, IP, Port, Line) of
     ok ->
-      ?info("Success sending ~s", [Line]),
+      ?debug("Success sending ~s", [Line]),
       {ok, St};
     {error, Reason} ->
       ?info("Unable to write metric ~s. ~p~n", [Line, Reason]),
