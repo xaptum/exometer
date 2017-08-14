@@ -126,9 +126,11 @@ key(APIKey, Prefix, Prob, DataPoint) ->
     [APIKey, $., Prefix, $., name(Prob, DataPoint)].
 
 %% Add probe and datapoint within probe
+
+name(Probe, value)->
+  string:join([metric_elem_to_list(I) || I <- Probe], ".");
 name(Probe, DataPoint) ->
-  ?debug("Probe: ~p, DataPoint: ~p", [Probe, DataPoint]),
-    [[[metric_elem_to_list(I), $.] || I <- Probe, I =/= value ], datapoint(DataPoint)].
+  [[[metric_elem_to_list(I), $.] || I <- Probe ], datapoint(DataPoint)].
 
 metric_elem_to_list(V) when is_atom(V) -> atom_to_list(V);
 metric_elem_to_list(V) when is_binary(V) -> binary_to_list(V);
