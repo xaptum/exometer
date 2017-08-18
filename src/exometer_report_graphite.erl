@@ -69,6 +69,8 @@ exometer_init(Opts) ->
 %% xaptum  graphite meter data points hack
 exometer_report(Probe, mean, _Extra, Value, St)->
   exometer_report(Probe, mean_rate, _Extra, Value, St);
+exometer_report(Probe, instant, _Extra, Value, St)->
+  exometer_report(Probe, instant_rate, _Extra, Value, St);
 exometer_report(Probe, one, _Extra, Value, St)->
   exometer_report(Probe, one_minute_rate, _Extra, Value, St);
 exometer_report(Probe, five, _Extra, Value, St)->
